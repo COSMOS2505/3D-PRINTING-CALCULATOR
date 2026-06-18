@@ -31,9 +31,7 @@ Pricing a 3D printed part is more than just material weight. This tool helps you
 ---
 
 ## 📸 Preview
-
-<img width="947" height="974" alt="Print" src="https://github.com/user-attachments/assets/2f35f3b6-f5aa-4af4-93e8-a6adb484263f" />
-
+<img width="995" height="997" alt="image" src="https://github.com/user-attachments/assets/30446360-1256-47e1-89df-c0c87f2bb825" />
 
 
 ---
