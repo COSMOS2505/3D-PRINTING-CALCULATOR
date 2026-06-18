@@ -7,7 +7,7 @@ ctk.set_default_color_theme("blue")
 IMPRESSORAS = {
     "Bambu Lab A1 (150W)": 150,
     "Bambu Lab A1 Mini (80W)": 80,
-    "Bambu Lab P1S (350W)": 350,
+    "Bambu Lab P2S (350W)": 350,
     "Ender 3 V2 (350W)": 350,
     "Prusa MK4 (300W)": 300,
     "Outra (Manual)": 0
@@ -39,9 +39,16 @@ class App(ctk.CTk):
         self.entry_peso = ctk.CTkEntry(self.frame_esquerda, width=320, height=30)
         self.entry_peso.pack(pady=(0, 8), anchor="w")
 
-        self.criar_legenda(self.frame_esquerda, "TEMPO ESTIMADO (Horas)")
-        self.entry_tempo = ctk.CTkEntry(self.frame_esquerda, width=320, height=30)
-        self.entry_tempo.pack(pady=(0, 8), anchor="w")
+        # --- NOVA SEÇÃO DE TEMPO DIVIDIDA ---
+        self.criar_legenda(self.frame_esquerda, "TEMPO ESTIMADO")
+        self.frame_tempo = ctk.CTkFrame(self.frame_esquerda, fg_color="transparent")
+        self.frame_tempo.pack(pady=(0, 8), anchor="w")
+        
+        self.entry_horas = ctk.CTkEntry(self.frame_tempo, width=155, height=30, placeholder_text="Horas")
+        self.entry_horas.pack(side="left", padx=(0, 10))
+        
+        self.entry_minutos = ctk.CTkEntry(self.frame_tempo, width=155, height=30, placeholder_text="Minutos")
+        self.entry_minutos.pack(side="left")
 
         self.criar_legenda(self.frame_esquerda, "MÃO DE OBRA (€ TOTAL)")
         self.entry_mao_obra = ctk.CTkEntry(self.frame_esquerda, width=320, height=30)
@@ -60,12 +67,12 @@ class App(ctk.CTk):
 
         self.criar_legenda(self.frame_esquerda, "MODELO DA MÁQUINA")
         self.combo_maq = ctk.CTkComboBox(self.frame_esquerda, values=list(IMPRESSORAS.keys()), width=320, height=30)
-        self.combo_maq.set("Bambu Lab A1 (150W)")
+        self.combo_maq.set("Bambu Lab P2S (350W)")
         self.combo_maq.pack(pady=(0, 8), anchor="w")
 
         self.criar_legenda(self.frame_esquerda, "PREÇO DO FILAMENTO (€/KG)")
         self.entry_preco_kg = ctk.CTkEntry(self.frame_esquerda, width=320, height=30)
-        self.entry_preco_kg.insert(0, "15")
+        self.entry_preco_kg.insert(0, "18")
         self.entry_preco_kg.pack(pady=(0, 8), anchor="w")
 
         self.criar_legenda(self.frame_esquerda, "CUSTO ENERGIA kWh (€)")
@@ -78,7 +85,7 @@ class App(ctk.CTk):
         self.entry_extra.insert(0, "0.00")
         self.entry_extra.pack(pady=(0, 8), anchor="w")
 
-        # --- BOTÃO CORRIGIDO E VISÍVEL ---
+        # --- BOTÃO EXECUTAR ---
         self.btn_calc = ctk.CTkButton(self.frame_esquerda, text="EXECUTAR CÁLCULO", 
                                       font=("Roboto", 14, "bold"), height=45, width=320,
                                       fg_color="#005f73", hover_color="#00d4ff",
@@ -103,9 +110,14 @@ class App(ctk.CTk):
         self.label_resultado.pack(pady=20, anchor="w")
 
         self.label_lucro = ctk.CTkLabel(self.frame_direita, 
-                                        text="LUCRO: € 0.00\nMARGEM: 0%", 
+                                        text="LUCRO: € 0.00\nMARGEM: 0%\nL/HORA: € 0.00/h", 
                                         font=("Courier New", 26, "bold"), text_color="#00ff00", justify="left")
         self.label_lucro.pack(pady=10, anchor="w")
+
+        # --- NOVA LABEL PARA ALERTAS DE NEGÓCIO ---
+        self.label_alerta = ctk.CTkLabel(self.frame_direita, text="", 
+                                         font=("Courier New", 16, "bold"), text_color="#ffcc00", justify="left")
+        self.label_alerta.pack(pady=10, anchor="w")
 
     def criar_legenda(self, container, texto):
         label = ctk.CTkLabel(container, text=texto, font=("Arial", 10, "bold"), text_color="white")
@@ -114,22 +126,36 @@ class App(ctk.CTk):
     def calcular(self):
         try:
             peso = float(self.entry_peso.get().replace(',', '.'))
-            tempo = float(self.entry_tempo.get().replace(',', '.'))
             mao_obra = float(self.entry_mao_obra.get().replace(',', '.'))
             venda = float(self.entry_venda.get().replace(',', '.'))
             preco_kg = float(self.entry_preco_kg.get().replace(',', '.'))
             kwh_preco = float(self.entry_kwh.get().replace(',', '.'))
             extras = float(self.entry_extra.get().replace(',', '.'))
             
+            # --- TRATAMENTO HORAS E MINUTOS ---
+            txt_horas = self.entry_horas.get().strip()
+            txt_minutos = self.entry_minutos.get().strip()
+            
+            horas = float(txt_horas.replace(',', '.')) if txt_horas else 0.0
+            minutos = float(txt_minutos.replace(',', '.')) if txt_minutos else 0.0
+            
+            tempo_total_horas = horas + (minutos / 60.0)
+            
+            if tempo_total_horas == 0:
+                messagebox.showerror("ERRO", "O tempo total de impressão não pode ser zero.")
+                return
+
             potencia = IMPRESSORAS[self.combo_maq.get()]
             
             c_mat = (preco_kg / 1000) * peso
-            c_ene = (potencia / 1000) * tempo * kwh_preco
-            c_desgaste = tempo * 0.05
+            c_ene = (potencia / 1000) * tempo_total_horas * kwh_preco
+            c_desgaste = tempo_total_horas * 0.05
             
             custo_total = c_mat + c_ene + c_desgaste + extras + mao_obra
             lucro_abs = venda - custo_total
             margem = (lucro_abs / venda) * 100 if venda > 0 else 0
+            
+            lucro_por_hora = lucro_abs / tempo_total_horas
             
             res = (f"Material:    € {c_mat:.2f}\n"
                    f"Energia:     € {c_ene:.2f}\n"
@@ -141,13 +167,29 @@ class App(ctk.CTk):
             
             self.label_resultado.configure(text=res)
             
-            lucro_txt = f"LUCRO:  € {lucro_abs:.2f}\nMARGEM: {margem:.1f}%"
+            lucro_txt = (f"LUCRO:   € {lucro_abs:.2f}\n"
+                         f"MARGEM:  {margem:.1f}%\n"
+                         f"L/HORA:  € {lucro_por_hora:.2f}/h")
             self.label_lucro.configure(text=lucro_txt)
-            self.label_lucro.configure(text_color="#00ff00" if lucro_abs >= 0 else "#ff4d4d")
+            
+            # --- LÓGICA DE ALERTA E CORES MELHORADA ---
+            if lucro_abs < 0:
+                # Prejuízo Total
+                self.label_lucro.configure(text_color="#ff4d4d")
+                self.label_alerta.configure(text="⚠️ PREJUÍZO DETECTADO!", text_color="#ff4d4d")
+            elif lucro_por_hora < 5.0:
+                # Lucrativo, mas abaixo de 5€ por hora
+                self.label_lucro.configure(text_color="#ffcc00") # Amarelo
+                self.label_alerta.configure(text="⚠️ Baixo Lucro/Hora (< €5.00/h)", text_color="#ffcc00")
+            else:
+                # Lucro saudável
+                self.label_lucro.configure(text_color="#00ff00") # Verde
+                self.label_alerta.configure(text="✨ Margem Operacional Saudável", text_color="#00ff00")
+
             self.label_status.configure(text="STATUS: ANÁLISE CONCLUÍDA", text_color="#00ff00")
             
-        except Exception:
-            messagebox.showerror("ERRO", "Preencha todos os campos com números.")
+        except ValueError:
+            messagebox.showerror("ERRO", "Preencha os campos obrigatórios com valores numéricos válidos.")
 
 if __name__ == "__main__":
     app = App()
